@@ -236,7 +236,7 @@ export class PlatformSubscriptionService {
    * Provisions a new tenant with the trial experience.
    * Returns the subscription status to be persisted.
    */
-  static buildTrialSubscription(tenantId: string): {
+  static buildTrialSubscription(_tenantId: string): {
     status: TenantSubscriptionStatus;
     tier: PlanTier;
     trialEndsAt: Date;

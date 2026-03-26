@@ -95,6 +95,15 @@ curl -X POST http://localhost:4000/api/v1/auth/register-tenant \
 
 Open `http://localhost:3000` and log in.
 
+## API Documentation
+
+**Interactive API docs** are available at `/api-docs` when the server is running:
+
+- **Local:** [http://localhost:4000/api-docs](http://localhost:4000/api-docs)
+- **Raw OpenAPI spec:** [http://localhost:4000/api/v1/docs/openapi.json](http://localhost:4000/api/v1/docs/openapi.json)
+
+The Swagger UI lets you explore all endpoints, view request/response schemas, and test API calls directly in the browser.
+
 ## API Endpoints
 
 | Method | Endpoint | Auth | Description |

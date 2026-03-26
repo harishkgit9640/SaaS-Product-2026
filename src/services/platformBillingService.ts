@@ -1,7 +1,6 @@
 import {
   PLAN_DEFINITIONS,
   DEFAULT_PLAN_TIER,
-  isUpgrade as checkIsUpgrade,
   getEffectiveLimits,
   PlanTier,
   BillingCycle,

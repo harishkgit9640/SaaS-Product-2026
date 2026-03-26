@@ -119,8 +119,14 @@ This starts the Express server on `http://localhost:4000` using `tsx watch` (aut
 
 ```bash
 curl http://localhost:4000/api/v1/health
-# Expected: {"status":"ok"}
+# Expected: {"success":true,"data":{"service":"feeautomate-backend","status":"ok"}}
 ```
+
+**Browse the API docs:**
+
+Open [http://localhost:4000/api-docs](http://localhost:4000/api-docs) in your browser to access the interactive Swagger UI with all endpoints documented.
+
+The raw OpenAPI 3.0 JSON spec is available at `http://localhost:4000/api/v1/docs/openapi.json` (useful for importing into Postman or generating client SDKs).
 
 ### 2.7 Start the Frontend App
 
@@ -1076,26 +1082,14 @@ FeeAutomate uses [Helmet](https://helmetjs.github.io/) which sets these headers 
 
 ### 14.4 Rate Limiting
 
-Add rate limiting in production. Install and configure:
+FeeAutomate includes built-in rate limiting via `express-rate-limit`:
 
-```bash
-npm install express-rate-limit
-```
+- **Production:** 100 requests per 15-minute window per IP
+- **Development:** 1,000 requests per 15-minute window per IP
 
-```typescript
-import rateLimit from "express-rate-limit";
+Rate limit headers (`RateLimit-Policy`, `RateLimit-Remaining`, `RateLimit-Reset`) are included in all API responses.
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 100,                    // 100 requests per window
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use("/api/", limiter);
-```
-
-Or use Nginx rate limiting:
+For additional protection, you can also add Nginx rate limiting:
 
 ```nginx
 limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
@@ -1117,22 +1111,16 @@ location /api/ {
 
 Webhook payloads are verified using HMAC-SHA256 signature comparison with `crypto.timingSafeEqual` to prevent timing attacks.
 
-### 14.7 CORS (if needed)
+### 14.7 CORS
 
-If the frontend and backend are on different domains, add CORS:
+FeeAutomate includes built-in CORS configuration:
 
-```bash
-npm install cors
-```
+- **Development:** All origins allowed (for local frontend dev on `:3000`)
+- **Production:** Restricted to `*.feeautomate.com` subdomains
+- Allowed headers: `Content-Type`, `Authorization`, `x-tenant-id`
+- Credentials: enabled
 
-```typescript
-import cors from "cors";
-
-app.use(cors({
-  origin: ["https://app.feeautomate.com"],
-  credentials: true,
-}));
-```
+The CORS configuration is in `src/app.ts` and adjusts automatically based on `NODE_ENV`.
 
 ---
 
@@ -1140,7 +1128,14 @@ app.use(cors({
 
 ### 15.1 API Testing with Postman
 
-**Import the API collection:**
+**Option 1: Import from OpenAPI spec (recommended)**
+
+1. Start the backend server (`npm run dev`)
+2. In Postman, click **Import → Link**
+3. Enter: `http://localhost:4000/api/v1/docs/openapi.json`
+4. Postman will generate a complete collection with all endpoints, schemas, and examples
+
+**Option 2: Create manually**
 
 Create a Postman collection with these requests:
 

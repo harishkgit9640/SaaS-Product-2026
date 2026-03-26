@@ -76,7 +76,7 @@ frontend/
 | Dashboard | `/member` | Personal invoice summary and upcoming payments |
 | Invoices | `/member/invoices` | View all invoices with pay/receipt actions |
 | Payments | `/member/payments` | Make payments for invoices |
-| Receipt | `/member/receipt/:id` | View and download payment receipt |
+| Receipt | `/member/receipt/:invoiceId` | View and download payment receipt |
 
 ## Getting Started
 

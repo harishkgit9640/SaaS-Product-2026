@@ -178,6 +178,9 @@ Key variables:
 ## Project Structure
 
 ```
+├── database/                    # SQL schema & seed data
+│   ├── schema.sql              #   Complete PostgreSQL schema (public + tenant)
+│   └── seed.sql                #   Sample seed data with demo tenant
 ├── docs/                        # Documentation
 │   ├── INSTALLATION.md         #   Full setup & deployment guide
 │   └── PRICING_MODEL.md        #   SaaS pricing strategy
@@ -218,6 +221,8 @@ See [`docs/INSTALLATION.md`](docs/INSTALLATION.md) for comprehensive deployment 
 |----------|-------------|
 | [`docs/INSTALLATION.md`](docs/INSTALLATION.md) | Complete installation, setup, deployment, security, and testing guide |
 | [`docs/PRICING_MODEL.md`](docs/PRICING_MODEL.md) | SaaS pricing tiers, Razorpay subscription integration, upgrade/downgrade flows |
+| [`database/schema.sql`](database/schema.sql) | Complete PostgreSQL schema — public tables, tenant provisioning function, indexes, triggers |
+| [`database/seed.sql`](database/seed.sql) | Sample seed data with demo tenant, members, plans, invoices, payments |
 | [`frontend/README.md`](frontend/README.md) | Frontend architecture, pages, components, and setup |
 
 ## License

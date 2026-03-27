@@ -201,107 +201,82 @@ Inside the PostgreSQL shell:
 ```sql
 -- Create the database
 CREATE DATABASE feeautomate;
-
--- Enable the citext extension (required for case-insensitive email columns)
-\c feeautomate
-CREATE EXTENSION IF NOT EXISTS citext;
-
--- Verify
-\dt
--- (Should show empty — tables are created per-tenant at runtime)
-
 \q
 ```
 
-### 3.3 Schema-Per-Tenant Architecture
+### 3.3 Run the Schema Script
+
+The complete schema is defined in `database/schema.sql`. Run it to create all public tables, the tenant provisioning function, triggers, and indexes:
+
+```bash
+psql -U postgres -d feeautomate -f database/schema.sql
+```
+
+This creates:
+- `citext` and `pgcrypto` extensions
+- `public.tenants` — tenant registry
+- `public.platform_plans` — FeeAutomate SaaS pricing tiers
+- `public.tenant_subscriptions` — tenant billing state
+- `public.platform_invoices` — platform billing records
+- `public.platform_audit_logs` — platform audit trail
+- `provision_tenant_schema()` function — creates all per-tenant tables
+- `set_updated_at()` trigger function — auto-updates `updated_at` columns
+
+### 3.4 Seed Sample Data (Optional)
+
+Load the sample dataset with a demo tenant, members, plans, invoices, and payments:
+
+```bash
+psql -U postgres -d feeautomate -f database/seed.sql
+```
+
+This creates:
+- Platform plans for all 4 tiers (Starter, Growth, Pro, Enterprise)
+- A demo tenant `mygym` with schema `tenant_mygym`
+- An admin user (`admin@mygym.com` / `password123`)
+- 5 sample members, 4 plans, 5 subscriptions
+- 7 invoices (mix of paid, pending, overdue)
+- 4 payments (Razorpay and cash)
+- Notifications and audit log entries
+
+After seeding, you can log in at `http://localhost:3000` with:
+- **Tenant Code:** `mygym`
+- **Email:** `admin@mygym.com`
+- **Password:** `password123`
+
+### 3.5 Schema-Per-Tenant Architecture
 
 FeeAutomate uses **schema-per-tenant** isolation:
 
 ```
 PostgreSQL Database: feeautomate
 ├── public schema
-│   ├── tenants          (all tenant records)
-│   └── (platform tables for billing — see PRICING_MODEL.md)
+│   ├── tenants                 (tenant registry)
+│   ├── platform_plans          (SaaS pricing tiers)
+│   ├── tenant_subscriptions    (tenant billing state)
+│   ├── platform_invoices       (platform billing records)
+│   └── platform_audit_logs     (platform audit trail)
 ├── tenant_mygym schema
-│   ├── users
-│   ├── members
-│   ├── plans
-│   ├── subscriptions
-│   ├── invoices
-│   ├── payments
-│   └── notifications
+│   ├── users                   (admin + member login accounts)
+│   ├── members                 (people being billed)
+│   ├── plans                   (billing plans offered by tenant)
+│   ├── subscriptions           (member → plan assignments)
+│   ├── invoices                (bills to members)
+│   ├── payments                (payment records + gateway data)
+│   ├── notifications           (in-app + email alerts)
+│   └── audit_logs              (per-tenant admin action trail)
 ├── tenant_anothergym schema
-│   ├── users
-│   ├── members
-│   └── ... (same tables)
+│   └── ... (same tables, fully isolated)
 └── ...
 ```
 
-**You do NOT need to create tenant schemas manually.** They are created automatically when a tenant registers via the `POST /api/v1/auth/register-tenant` endpoint. The `AuthService.registerTenant` method:
+**You do NOT need to create tenant schemas manually.** They are created automatically when a tenant registers via the `POST /api/v1/auth/register-tenant` endpoint. The registration flow:
 
 1. Creates the tenant record in `public.tenants`
-2. Creates a `users` table in the new schema
-3. Calls `TenantSchemaRepository.ensureCoreDomainTables()` to create `members`, `plans`, `subscriptions`, `invoices`, `payments`, and `notifications` tables with indexes
-4. Creates the first admin user
+2. Calls `provision_tenant_schema()` to create all per-tenant tables
+3. Creates the first admin user
 
-### 3.4 Public Schema Setup
-
-The `public.tenants` table is auto-created by `TenantRepository.createTenant` on first tenant registration. If you want to create it manually:
-
-```sql
-\c feeautomate
-
-CREATE TABLE IF NOT EXISTS public.tenants (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_code TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  schema_name TEXT NOT NULL UNIQUE,
-  contact_email TEXT,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-```
-
-### 3.5 Seed Sample Data (Optional)
-
-After registering a tenant, you can seed data via the API:
-
-```bash
-# 1. Login to get an access token
-TOKEN=$(curl -s -X POST http://localhost:4000/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"tenantCode":"mygym","email":"admin@mygym.com","password":"securepassword123"}' \
-  | jq -r '.data.accessToken')
-
-# 2. Create a plan
-curl -X POST http://localhost:4000/api/v1/plans \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "x-tenant-id: mygym" \
-  -d '{"name":"Monthly Basic","amountCents":99900,"billingCycle":"monthly","description":"Basic gym membership"}'
-
-# 3. Create a member
-curl -X POST http://localhost:4000/api/v1/members \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "x-tenant-id: mygym" \
-  -d '{"fullName":"Rahul Sharma","email":"rahul@example.com","status":"active"}'
-
-# 4. Create a subscription (use IDs from the responses above)
-curl -X POST http://localhost:4000/api/v1/subscriptions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "x-tenant-id: mygym" \
-  -d '{"memberId":"<member-id>","planId":"<plan-id>","startDate":"2026-04-01","status":"active"}'
-
-# 5. Create an invoice
-curl -X POST http://localhost:4000/api/v1/invoices \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "x-tenant-id: mygym" \
-  -d '{"memberId":"<member-id>","invoiceNumber":"INV-MYGYM-202604-001","amountCents":99900,"dueDate":"2026-04-07"}'
-```
+The full SQL definitions are in [`database/schema.sql`](../database/schema.sql).
 
 ---
 
